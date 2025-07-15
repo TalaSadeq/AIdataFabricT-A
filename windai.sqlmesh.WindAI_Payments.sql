@@ -5,7 +5,7 @@ MODEL (
   grain 'user_id',
   cron '0 2 * * *',
   kind INCREMENTAL_BY_UNIQUE_KEY (
-    unique_key user_id,
+    unique_key (user_id),
     lookback 5
   )
 );
