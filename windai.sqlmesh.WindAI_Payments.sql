@@ -1,7 +1,7 @@
 MODEL (
   name windai.sqlmesh.WindAI_Payments,
   owner 'customer_analytics',
-  tags ('customer_analytics', 'financial_reporting'),
+  tags ('financial', 'customer_analytics'),
   grain 'user_id',
   cron '0 2 * * *',
   kind INCREMENTAL_BY_UNIQUE_KEY (
@@ -13,58 +13,58 @@ MODEL (
   )
 );
 
--- Staging layer: Select necessary columns from source tables
+-- Stage layer: Extract and filter base data from source tables
 WITH stg_customers AS (
   SELECT
-    c.customer_id
-  FROM windai.sqlmesh.customers AS c
-  WHERE c.customer_id IS NOT NULL
+    customer_id
+  FROM windai.sqlmesh.customers
+  WHERE customer_id IS NOT NULL
 ),
 
 stg_orders AS (
   SELECT
-    o.order_id,
-    o.customer_id
-  FROM windai.sqlmesh.orders AS o
-  WHERE o.order_id IS NOT NULL
-    AND o.customer_id IS NOT NULL
+    order_id,
+    customer_id
+  FROM windai.sqlmesh.orders
+  WHERE customer_id IS NOT NULL
+    AND order_id IS NOT NULL
 ),
 
 stg_payments AS (
   SELECT
-    p.order_id,
-    p.payment_value
-  FROM windai.sqlmesh.order_payments AS p
-  WHERE p.order_id IS NOT NULL
+    order_id,
+    payment_value
+  FROM windai.sqlmesh.order_payments
+  WHERE order_id IS NOT NULL
 ),
 
--- Transform layer: Aggregate order and payment data per customer
-transform_customer_aggregates AS (
+-- Transform layer: Calculate order metrics per customer
+transform_customer_metrics AS (
   SELECT
-    so.customer_id,
-    COUNT(DISTINCT so.order_id) AS count_of_orders,
-    SUM(COALESCE(sp.payment_value, 0.0)) AS sum_of_orders
-  FROM stg_orders AS so
-  LEFT JOIN stg_payments AS sp
-    ON so.order_id = sp.order_id
-  GROUP BY
-    so.customer_id
+    o.customer_id,
+    -- Count unique orders per customer
+    COUNT(DISTINCT o.order_id) AS count_of_orders,
+    -- Sum payment values for all customer orders
+    SUM(COALESCE(p.payment_value, 0.0)) AS sum_of_orders
+  FROM stg_orders AS o
+  LEFT JOIN stg_payments AS p
+    ON o.order_id = p.order_id
+  GROUP BY o.customer_id
 ),
 
--- Final layer: Join customer data with aggregates and ensure all customers are included
+-- Final layer: Ensure all customers are included with complete metrics
 final AS (
   SELECT
-    sc.customer_id AS user_id,
-    COALESCE(tca.count_of_orders, 0) AS count_of_orders,
-    COALESCE(tca.sum_of_orders, 0.0) AS sum_of_orders
-  FROM stg_customers AS sc
-  LEFT JOIN transform_customer_aggregates AS tca
-    ON sc.customer_id = tca.customer_id
+    c.customer_id AS user_id,
+    COALESCE(tcm.count_of_orders, 0) AS count_of_orders,
+    COALESCE(tcm.sum_of_orders, 0.0) AS sum_of_orders
+  FROM stg_customers AS c
+  LEFT JOIN transform_customer_metrics AS tcm
+    ON c.customer_id = tcm.customer_id
 )
 
--- Final SELECT statement
 SELECT
-  f.user_id,
-  f.count_of_orders,
-  f.sum_of_orders
-FROM final AS f;
+  user_id,
+  count_of_orders,
+  sum_of_orders
+FROM final;
