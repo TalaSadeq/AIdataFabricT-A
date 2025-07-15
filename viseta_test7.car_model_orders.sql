@@ -14,13 +14,11 @@ MODEL (
 WITH cars_models AS (
   SELECT
     cars.id AS car_id,
-    cars.user_id AS user_id,
     cars.model_id,
     models.name_en
   FROM cars
   INNER JOIN models ON cars.model_id = models.id
   WHERE cars.id IS NOT NULL
-    AND cars.user_id IS NOT NULL
     AND cars.model_id IS NOT NULL
     AND models.name_en IS NOT NULL
 ),
