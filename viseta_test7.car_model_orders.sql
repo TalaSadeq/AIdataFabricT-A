@@ -14,38 +14,41 @@ MODEL (
 WITH cars_models AS (
   SELECT
     cars.id AS car_id,
-    models.id AS model_id,
+    cars.user_id AS user_id,
+    cars.model_id,
     models.name_en
   FROM cars
-  JOIN models ON cars.id = models.id
+  INNER JOIN models ON cars.model_id = models.id
+  WHERE cars.id IS NOT NULL
+    AND cars.user_id IS NOT NULL
+    AND cars.model_id IS NOT NULL
+    AND models.name_en IS NOT NULL
 ),
-orders_users_cars AS (
+valid_orders AS (
   SELECT
     orders.id AS order_id,
     orders.created_at,
     orders.grand_total,
     orders.user_id,
-    orders.car_id,
-    cars_models.name_en
+    orders.car_id
   FROM orders
-  JOIN cars_models ON orders.car_id = cars_models.car_id
-  WHERE orders.user_id IS NOT NULL
+  WHERE orders.id IS NOT NULL
     AND orders.car_id IS NOT NULL
+    AND orders.user_id IS NOT NULL
 ),
-final_agg AS (
+final_aggregation AS (
   SELECT
-    ROW_NUMBER() OVER (ORDER BY name_en) AS id,
-    name_en,
-    COUNT(order_id) AS count_of_orders,
-    COALESCE(SUM(grand_total), 0) AS life_time_value
-  FROM orders_users_cars
-  WHERE name_en IS NOT NULL
-    AND order_id IS NOT NULL
-  GROUP BY name_en
+    ROW_NUMBER() OVER (ORDER BY cm.name_en) AS id,
+    cm.name_en,
+    COUNT(vo.order_id) AS count_of_orders,
+    COALESCE(SUM(vo.grand_total), 0) AS life_time_value
+  FROM valid_orders vo
+  INNER JOIN cars_models cm ON vo.car_id = cm.car_id
+  GROUP BY cm.name_en
 )
 SELECT
   id,
   name_en,
   count_of_orders,
   life_time_value
-FROM final_agg;
+FROM final_aggregation;
