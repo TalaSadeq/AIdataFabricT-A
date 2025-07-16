@@ -1,13 +1,9 @@
 MODEL(
-  name windai.sqlmesh.WindAI_Payments
-  kind INCREMENTAL_BY_UNIQUE_KEY (
-    unique_key = (customer_id),
-    lookback = 5
-  )
-  cron "0 2 * * *"
+  name windai.sqlmesh.WindAI_Payments,
+  kind INCREMENTAL_BY_UNIQUE_KEY (unique_key (customer_id), lookback 5),
+  cron "0 2 * * *",
   grain "One customer (user)"
-  owner_team "customer_analytics"
-)
+);
 
 WITH stage_orders AS (
   SELECT
@@ -19,10 +15,10 @@ WITH stage_orders AS (
 
 transform_customer_orders AS (
   SELECT
-    s.customer_id,
-    COUNT(DISTINCT s.order_id) AS total_orders
-  FROM stage_orders s
-  GROUP BY s.customer_id
+    so.customer_id,
+    COUNT(DISTINCT so.order_id) AS total_orders
+  FROM stage_orders so
+  GROUP BY so.customer_id
 ),
 
 final AS (
