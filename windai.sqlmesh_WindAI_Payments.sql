@@ -1,15 +1,12 @@
 MODEL(
-  name windai.sqlmesh.WindAI_Payments
-  owner_team customer_analytics
-  kind INCREMENTAL_BY_UNIQUE_KEY (
-    unique_key = (customer_id),
-    lookback = 5
-  )
-  cron "0 2 * * *"
+  name windai.sqlmesh.WindAI_Payments,
+  owner_team customer_analytics,
+  kind INCREMENTAL_BY_UNIQUE_KEY (unique_key = (customer_id), lookback = 5),
+  cron "0 2 * * *",
   grain "One customer (user)"
-)
+);
 
--- Stage: Prepare customers and orders with early null checks
+-- Stage: Extract valid customers and map user_id
 WITH stage_customers AS (
   SELECT
     customer_id,
@@ -17,6 +14,7 @@ WITH stage_customers AS (
   FROM windai.sqlmesh.customers
   WHERE customer_id IS NOT NULL
 ),
+-- Stage: Extract valid orders
 stage_orders AS (
   SELECT
     order_id,
@@ -25,8 +23,7 @@ stage_orders AS (
   FROM windai.sqlmesh.orders
   WHERE order_id IS NOT NULL AND customer_id IS NOT NULL
 ),
-
--- Transform: Join customers to orders
+-- Transform: Join customers to their orders
 transform_customer_orders AS (
   SELECT
     c.customer_id,
@@ -37,8 +34,7 @@ transform_customer_orders AS (
   INNER JOIN stage_orders o
     ON c.customer_id = o.customer_id
 ),
-
--- Final aggregation: count orders per customer, display user_id and first/last order dates
+-- Final: Aggregate the number of orders and order activity dates per customer
 final AS (
   SELECT
     customer_id,
