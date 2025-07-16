@@ -1,11 +1,11 @@
 MODEL(
   name windai.sqlmesh.WindAI_Payments,
-  kind INCREMENTAL_BY_UNIQUE_KEY (unique_key = (customer_id), lookback = 5),
+  kind INCREMENTAL_BY_UNIQUE_KEY (unique_key (customer_id), lookback 5),
   cron "0 2 * * *",
   grain "One customer (user)"
 );
 
--- Stage: Extract valid customers; derive user_id with NOT NULL enforcement
+-- Stage: Select customers and derive user_id, ensure not null
 WITH stage_customers AS (
   SELECT
     customer_id,
@@ -13,6 +13,7 @@ WITH stage_customers AS (
   FROM windai.sqlmesh.customers
   WHERE customer_id IS NOT NULL
 ),
+
 stage_orders AS (
   SELECT
     order_id,
@@ -21,7 +22,8 @@ stage_orders AS (
   FROM windai.sqlmesh.orders
   WHERE order_id IS NOT NULL AND customer_id IS NOT NULL
 ),
--- Transform: Join orders to customers via indexed foreign key for aggregation
+
+-- Transform: Relate orders to customers via indexed join
 transform_customer_orders AS (
   SELECT
     c.customer_id,
@@ -29,10 +31,10 @@ transform_customer_orders AS (
     o.order_id,
     o.order_purchase_timestamp
   FROM stage_customers c
-  INNER JOIN stage_orders o
-    ON c.customer_id = o.customer_id
+  INNER JOIN stage_orders o ON c.customer_id = o.customer_id
 ),
--- Final: Calculate total order count, first and last order dates per customer
+
+-- Final: Aggregate total orders for each customer, provide first and last purchase dates
 final AS (
   SELECT
     customer_id,
@@ -43,6 +45,7 @@ final AS (
   FROM transform_customer_orders
   GROUP BY customer_id, user_id
 )
+
 SELECT
   customer_id,
   user_id,
